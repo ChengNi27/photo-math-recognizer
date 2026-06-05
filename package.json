@@ -1,0 +1,12 @@
+{
+  "name": "photo-math-recognizer",
+  "version": "1.0.0",
+  "description": "拍照识题 - AI自动识别题目并计算答案",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

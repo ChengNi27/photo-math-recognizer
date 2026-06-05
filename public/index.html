@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拍照识题</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f5f7fa; color: #303133;
+  min-height: 100vh; padding: 20px 20px 80px 20px;
+  max-width: 600px; margin: 0 auto;
+}
+h1 { text-align: center; font-size: 20px; margin: 16px 0 24px; }
+.mode-selector {
+  display: flex; background: #fff; border-radius: 12px;
+  padding: 4px; margin-bottom: 16px; gap: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.mode-btn {
+  flex: 1; padding: 10px 0; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  background: transparent; color: #606266; transition: all 0.2s;
+}
+.mode-btn.active {
+  background: #4f6ef7; color: #fff; font-weight: 600;
+}
+.mode-btn .mode-label { font-size: 12px; opacity: 0.7; display: block; }
+.upload-zone {
+  border: 2px dashed #c0c4cc; border-radius: 12px;
+  padding: 48px 20px; text-align: center; cursor: pointer;
+  background: #fff; transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 16px;
+}
+.upload-zone:hover { border-color: #4f6ef7; background: #f0f2ff; }
+.upload-zone .icon { font-size: 52px; margin-bottom: 8px; }
+.upload-zone p { font-size: 15px; color: #606266; }
+.upload-zone .hint { font-size: 12px; color: #909399; margin-top: 6px; }
+#fileInput { display: none; }
+.preview-wrap { position: relative; margin-bottom: 16px; display: none; }
+.preview-wrap img { width: 100%; border-radius: 12px; border: 1px solid #e4e7ed; }
+.preview-wrap .btn-change {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,0,0,0.55); color: #fff; border: none;
+  border-radius: 6px; padding: 4px 12px; font-size: 13px; cursor: pointer;
+}
+.btn {
+  display: block; width: 100%; padding: 14px;
+  border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
+  cursor: pointer; text-align: center; transition: opacity 0.2s;
+}
+.btn-primary { background: #4f6ef7; color: #fff; margin-bottom: 12px; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.loading { display: none; text-align: center; padding: 32px 16px; }
+.loading.active { display: block; }
+.spinner {
+  width: 36px; height: 36px; border: 3px solid #e4e7ed;
+  border-top-color: #4f6ef7; border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: #909399; }
+.result-card {
+  background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 16px; margin-bottom: 12px; border-left: 4px solid #4f6ef7;
+}
+.result-card .q-num { font-size: 13px; color: #4f6ef7; font-weight: 600; margin-bottom: 8px; }
+.result-card .q-text { font-size: 15px; line-height: 1.7; margin-bottom: 10px; color: #303133; white-space: pre-wrap; }
+.result-card .q-answer { font-size: 15px; color: #67c23a; font-weight: 600; }
+.result-card .q-answer::before { content: "答案："; font-weight: 400; color: #909399; }
+.result-card .q-process {
+  font-size: 13px; line-height: 1.6; color: #606266;
+  background: #f8f9fc; padding: 10px 12px; border-radius: 6px;
+  margin-top: 8px; white-space: pre-wrap;
+}
+.result-card .q-process::before { content: "解题过程："; font-weight: 600; color: #4f6ef7; display: block; margin-bottom: 4px; }
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 999; padding: 10px 22px; border-radius: 8px;
+  font-size: 14px; color: #fff; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.toast.ok { background: #67c23a; }
+.toast.err { background: #f56c6c; }
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; background: #fff; border-top: 1px solid #e4e7ed;
+  z-index: 100; max-width: 600px; margin: 0 auto;
+}
+.nav-item {
+  flex: 1; text-align: center; padding: 10px 0;
+  font-size: 13px; color: #909399; cursor: pointer;
+  border: none; background: none; transition: color 0.2s;
+}
+.nav-item.active { color: #4f6ef7; font-weight: 600; }
+.nav-item .nav-icon { font-size: 20px; display: block; margin-bottom: 2px; }
+.page { display: none; }
+.page.active { display: block; }
+.btn-wrong {
+  display: block; width: 100%; padding: 8px 0;
+  background: none; border: 1px dashed #f56c6c; color: #f56c6c;
+  border-radius: 6px; font-size: 13px; cursor: pointer;
+  margin-top: 10px; transition: all 0.2s;
+}
+.btn-wrong:hover { background: #fef0f0; }
+.btn-wrong.added { border: 1px solid #67c23a; color: #67c23a; background: #f0f9eb; }
+.wrong-empty { text-align: center; padding: 60px 20px; color: #909399; }
+.wrong-empty .icon { font-size: 48px; margin-bottom: 12px; }
+.wrong-card {
+  background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 16px; margin-bottom: 12px; border-left: 4px solid #f56c6c; position: relative;
+}
+.wrong-card .q-num { font-size: 13px; color: #f56c6c; font-weight: 600; margin-bottom: 8px; }
+.wrong-card .q-text { font-size: 15px; line-height: 1.7; margin-bottom: 8px; color: #303133; white-space: pre-wrap; }
+.wrong-card .q-answer { font-size: 14px; color: #67c23a; font-weight: 600; margin-bottom: 8px; }
+.wrong-card .q-answer::before { content: "正确答案："; font-weight: 400; color: #909399; }
+.wrong-card .btn-remove {
+  position: absolute; top: 12px; right: 12px;
+  background: none; border: none; color: #909399; font-size: 18px;
+  cursor: pointer; padding: 2px 6px;
+}
+.wrong-card .btn-remove:hover { color: #f56c6c; }
+.katex { font-size: 1.1em; }
+</style>
+</head>
+<body>
+
+<div class="page active" id="pageCamera">
+<h1>拍照识题</h1>
+<div class="mode-selector">
+  <button class="mode-btn active" id="modeEasy" onclick="switchMode('easy')">
+    📝 简单模式<span class="mode-label">选择/填空/计算题</span>
+  </button>
+  <button class="mode-btn" id="modeHard" onclick="switchMode('hard')">
+    🔬 难题模式<span class="mode-label">复杂图表/传递函数</span>
+  </button>
+</div>
+<div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+  <div class="icon">📷</div>
+  <p>点击拍照或选择图片</p>
+  <div class="hint">支持 JPG / PNG，自动识别题目和答案</div>
+</div>
+<input type="file" id="fileInput" accept="image/*" capture="environment" onchange="onFilePicked(event)">
+<div class="preview-wrap" id="previewWrap">
+  <img id="previewImg" alt="预览">
+  <button class="btn-change" onclick="document.getElementById('fileInput').click()">换一张</button>
+</div>
+<button class="btn btn-primary" id="btnRecognize" disabled onclick="startRecognize()">开始识别</button>
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">AI 正在识别题目和答案...</div>
+</div>
+<div id="results"></div>
+</div>
+
+<div class="page" id="pageWrong">
+  <h1>错题集</h1>
+  <div id="wrongBook"></div>
+</div>
+
+<nav class="bottom-nav">
+  <button class="nav-item active" id="navCamera" onclick="switchPage('camera')">
+    <span class="nav-icon">📷</span>拍照识题
+  </button>
+  <button class="nav-item" id="navWrong" onclick="switchPage('wrong')">
+    <span class="nav-icon">📋</span>错题集
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== API Key 已移到后端代理，前端不再暴露 =====
+let currentMode = 'easy';
+let currentBase64 = null;
+let lastResults = [];
+let toastTimer = null;
+
+function showToast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + (type || 'ok') + ' show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2500);
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('modeEasy').classList.toggle('active', mode === 'easy');
+  document.getElementById('modeHard').classList.toggle('active', mode === 'hard');
+  var label = mode === 'easy' ? '简单模式（精准推理）' : '难题模式（快速响应）';
+  showToast('已切换到：' + label);
+}
+
+function onFilePicked(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('previewImg').src = ev.target.result;
+    document.getElementById('previewWrap').style.display = 'block';
+    document.getElementById('uploadZone').style.display = 'none';
+    document.getElementById('btnRecognize').disabled = false;
+    document.getElementById('results').innerHTML = '';
+    compressImage(file).then(function(b64) { currentBase64 = b64; });
+  };
+  reader.readAsDataURL(file);
+}
+
+function compressImage(file) {
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var w = img.width, h = img.height;
+        var maxW = 1024;
+        if (Math.max(w, h) > maxW) {
+          var r = maxW / Math.max(w, h);
+          w = Math.round(w * r);
+          h = Math.round(h * r);
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function startRecognize() {
+  if (!currentBase64) return;
+  var btn = document.getElementById('btnRecognize');
+  btn.disabled = true;
+  var loadingEl = document.getElementById('loading');
+  var loadingTxt = loadingEl.querySelector('.loading-text');
+  loadingEl.classList.add('active');
+  document.getElementById('results').innerHTML = '';
+
+  var timer = null;
+  try {
+    loadingTxt.textContent = 'AI 正在识别题目并计算答案...';
+    var startTime = Date.now();
+    timer = setInterval(function() {
+      var s = Math.floor((Date.now() - startTime) / 1000);
+      loadingTxt.textContent = 'AI 正在识别题目并计算答案...（' + s + 's）';
+    }, 1000);
+    var result = await callBackend(currentBase64, currentMode);
+    clearInterval(timer);
+    var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log('=== [调试] ' + result.model + ' 耗时 ' + elapsed + 's ===\n' + result.text);
+
+    var questions = parseQuestions(result.text);
+    lastResults = questions;
+    renderResults(questions);
+    loadingEl.classList.remove('active');
+    if (questions.length === 0) {
+      showToast('未能识别出题目，请换一张清晰的图片试试', 'err');
+    } else {
+      showToast('识别完成，共 ' + questions.length + ' 道题（耗时 ' + elapsed + 's）');
+    }
+  } catch (err) {
+    clearInterval(timer);
+    loadingEl.classList.remove('active');
+    showToast('识别失败：' + (err.message || err), 'err');
+  }
+  btn.disabled = false;
+}
+
+// ===== 调用后端代理（API Key 在服务器端，前端不可见）=====
+async function callBackend(base64Image, mode) {
+  var res = await fetch('/api/recognize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64Image, mode: mode }),
+    signal: AbortSignal.timeout(120000)
+  });
+
+  var data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || '服务器错误 ' + res.status);
+  }
+
+  return data;
+}
+
+function parseQuestions(text) {
+  var json = text;
+  var m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (m) json = m[1];
+  json = json.trim();
+  try {
+    var arr = JSON.parse(json);
+    if (!Array.isArray(arr)) arr = [arr];
+    return arr.map(function(q) {
+      return {
+        question: q.question || '',
+        answer: q.answer || q.correctAnswer || q.correct_answer || '',
+        process: q.process || ''
+      };
+    }).filter(function(q) { return q.question.trim(); });
+  } catch(e) {
+    return [];
+  }
+}
+
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function wrapLatex(html) {
+  if (!html) return html;
+  if (/\$/.test(html) || /\\\(/.test(html)) return html;
+  html = html.replace(
+    /(\\[a-zA-Z]+(?:\{[^{}]*\}(?:\{[^{}]*\})*)?)/g,
+    '$$$1$$'
+  );
+  return html;
+}
+
+function renderResults(questions) {
+  var el = document.getElementById('results');
+  if (!questions || questions.length === 0) {
+    el.innerHTML =
+      '<div style="text-align:center;padding:40px 20px;color:#909399;font-size:15px">' +
+      '⚠️ 未识别出题目<br>' +
+      '<span style="font-size:13px">请尝试换个角度拍照，或确保题目区域清晰可见</span></div>';
+    return;
+  }
+
+  var html = '';
+  questions.forEach(function(q, i) {
+    var already = isInWrongBook(q.question);
+    html +=
+      '<div class="result-card">' +
+        '<div class="q-num">第 ' + (i+1) + ' 题</div>' +
+        '<div class="q-text">' + wrapLatex(esc(q.question)) + '</div>' +
+        '<div class="q-answer">' + wrapLatex(esc(q.answer)) + '</div>' +
+        (q.process ? '<div class="q-process">' + wrapLatex(esc(q.process)) + '</div>' : '') +
+        '<button class="btn-wrong' + (already ? ' added' : '') + '" ' +
+        'data-index="' + i + '" onclick="window.toggleWrong(this)">' +
+        (already ? '✓ 已加入错题集' : '+ 加入错题集') +
+        '</button>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+
+  if (window.renderMathInElement) {
+    try {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '$', right: '$', display: false }
+        ],
+        throwOnError: false
+      });
+    } catch(e) {}
+  }
+}
+
+window.toggleWrong = function(btn) {
+  var idx = parseInt(btn.getAttribute('data-index'));
+  var q = lastResults[idx];
+  if (!q) { showToast('数据异常，请重新识别', 'err'); return; }
+  if (isInWrongBook(q.question)) { showToast('该题已在错题集中', 'err'); return; }
+  addWrongItem(q);
+  btn.classList.add('added');
+  btn.textContent = '✓ 已加入错题集';
+  showToast('已加入错题集！', 'ok');
+};
+
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  if (name === 'camera') {
+    document.getElementById('pageCamera').classList.add('active');
+    document.getElementById('navCamera').classList.add('active');
+  } else {
+    document.getElementById('pageWrong').classList.add('active');
+    document.getElementById('navWrong').classList.add('active');
+    renderWrongBook();
+  }
+}
+
+const WRONG_KEY = 'wrong_book_items';
+
+function getWrongItems() {
+  try { return JSON.parse(localStorage.getItem(WRONG_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function saveWrongItems(items) {
+  localStorage.setItem(WRONG_KEY, JSON.stringify(items));
+}
+
+function addWrongItem(q) {
+  var items = getWrongItems();
+  if (items.some(function(item) { return item.question === q.question; })) return false;
+  items.unshift({ id: Date.now(), question: q.question, answer: q.answer, process: q.process || '', addedAt: new Date().toISOString() });
+  saveWrongItems(items);
+  return true;
+}
+
+function removeWrongItem(id) {
+  var items = getWrongItems().filter(function(item) { return item.id !== id; });
+  saveWrongItems(items);
+}
+
+function isInWrongBook(question) {
+  return getWrongItems().some(function(item) { return item.question === question; });
+}
+
+function renderWrongBook() {
+  var el = document.getElementById('wrongBook');
+  var items = getWrongItems();
+  if (items.length === 0) {
+    el.innerHTML = '<div class="wrong-empty"><div class="icon">📋</div><p>还没有错题，回到拍照页添加吧</p></div>';
+    return;
+  }
+
+  var html = '<div style="margin-bottom:16px;font-size:18px;font-weight:600;">共 ' + items.length + ' 道错题</div>';
+  items.forEach(function(item) {
+    html +=
+      '<div class="wrong-card">' +
+        '<button class="btn-remove" onclick="window.removeAndRefresh(' + item.id + ')">&times;</button>' +
+        '<div class="q-num">错题</div>' +
+        '<div class="q-text">' + wrapLatex(esc(item.question)) + '</div>' +
+        '<div class="q-answer">' + wrapLatex(esc(item.answer)) + '</div>' +
+        (item.process ? '<div class="q-process">' + wrapLatex(esc(item.process)) + '</div>' : '') +
+      '</div>';
+  });
+  el.innerHTML = html;
+
+  if (window.renderMathInElement) {
+    try {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '$', right: '$', display: false }
+        ],
+        throwOnError: false
+      });
+    } catch(e) {}
+  }
+}
+
+window.removeAndRefresh = function(id) {
+  if (!confirm('确定删除这道错题吗？')) return;
+  removeWrongItem(id);
+  renderWrongBook();
+  showToast('已删除', 'ok');
+};
+</script>
+</body>
+</html>
